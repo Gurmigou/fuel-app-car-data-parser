@@ -12,7 +12,7 @@ import javax.persistence.Embeddable;
 @Embeddable
 public class CarFuel {
     private Integer tankVolume;
-    private CarFuelConsumptionType consumptionType;
+    private CarFuelConsumptionType fuelType;
     private Double consumptionInCity;
     private Double consumptionOutsideCity;
     private Double consumptionAverage;

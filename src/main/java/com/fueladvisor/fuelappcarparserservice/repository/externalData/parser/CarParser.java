@@ -1,4 +1,4 @@
-package com.fueladvisor.fuelappcarparserservice.repository.externalData;
+package com.fueladvisor.fuelappcarparserservice.repository.externalData.parser;
 
 import com.fueladvisor.fuelappcarparserservice.model.carCharacteristics.Car;
 

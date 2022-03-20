@@ -1,15 +1,13 @@
 package com.fueladvisor.fuelappcarparserservice.model.carCharacteristics;
 
 import com.fueladvisor.fuelappcarparserservice.model.carBrandInfo.CarModel;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
+import lombok.*;
 
 import javax.persistence.*;
 
 @Entity
 @Getter
+@Setter
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
@@ -23,13 +21,13 @@ public class Car {
     private String type;
     private String equipment;
 
-    @Enumerated(EnumType.ORDINAL)
-    private CarForCountryType forCountry;
+//    @Enumerated(EnumType.ORDINAL)
+//    private CarForMarket forMarket;
 
-    @Column(name = "release_year_start")
-    private Integer releaseYearStart;
-    @Column(name = "relase_year_end")
-    private Integer releaseYearEnd;
+    @Column(name = "release_start_year")
+    private Integer releaseStartYear;
+    @Column(name = "relase_end_year")
+    private Integer releaseEndYear;
 
     @Embedded
     private CarParams carParams;

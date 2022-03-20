@@ -11,4 +11,16 @@ public enum CarDriveType {
     FOUR_WHEEL("four-wheel");
 
     private final String name;
+
+    public static CarDriveType getTypeByParsedName(String parsedType) {
+        if (parsedType.equals("Передний"))
+            return FRONT_WHEEL;
+        if (parsedType.equals("Задний"))
+            return REAR_WHEEL;
+
+        // TODO: 20.03.2022 для проверки
+        System.out.println(parsedType);
+
+        return FOUR_WHEEL;
+    }
 }

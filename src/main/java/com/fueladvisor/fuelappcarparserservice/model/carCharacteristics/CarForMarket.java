@@ -3,7 +3,7 @@ package com.fueladvisor.fuelappcarparserservice.model.carCharacteristics;
 import lombok.AllArgsConstructor;
 
 @AllArgsConstructor
-public enum CarForCountryType {
+public enum CarForMarket {
     EUROPE("Europe"),
     USA("USA");
 

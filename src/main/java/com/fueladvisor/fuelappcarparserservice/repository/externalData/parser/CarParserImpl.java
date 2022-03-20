@@ -1,8 +1,10 @@
-package com.fueladvisor.fuelappcarparserservice.repository.externalData;
+package com.fueladvisor.fuelappcarparserservice.repository.externalData.parser;
 
 import com.fueladvisor.fuelappcarparserservice.model.carBrandInfo.CarBrand;
 import com.fueladvisor.fuelappcarparserservice.model.carBrandInfo.CarModel;
 import com.fueladvisor.fuelappcarparserservice.model.carCharacteristics.Car;
+import com.fueladvisor.fuelappcarparserservice.repository.externalData.util.CarCharacteristicsParser;
+import com.fueladvisor.fuelappcarparserservice.repository.externalData.util.ParsedCarDataWrapper;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
@@ -10,16 +12,14 @@ import org.springframework.data.util.Pair;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @Component
 public class CarParserImpl implements CarParser {
     private static final String url = "https://www.drom.ru/catalog/";
+    private static final String pureUrl = "https://www.drom.ru";
 
     @Override
     public List<Car> parseCarData() throws IOException {
@@ -31,10 +31,15 @@ public class CarParserImpl implements CarParser {
 
         // parse a list of specs of each model
         var wrappedSpec = getSpecNameAndUrlList(wrappedModel);
-        int a = 5;
 
-        // TODO: 23.02.2022
-        return null;
+        // parse a list of equipments of each model
+        var wrappedEquipment = getEquipmentNameAndUrlList(wrappedSpec);
+
+        return wrappedEquipment.stream()
+                .map(this::mapParsedCarDataWrapperToCar)
+                .filter(Optional::isPresent)
+                .map(Optional::get)
+                .collect(Collectors.toList());
     }
 
     private List<ParsedCarDataWrapper> getBrandNameAndUrlList() throws IOException {
@@ -76,9 +81,26 @@ public class CarParserImpl implements CarParser {
                         .map(pair -> new ParsedCarDataWrapper()
                                 .mergeWrappers(wrapper)
                                 .setSpecName(pair.getFirst())
-                                .setSpecUrl(String.format("%s/%s/%s/%s",
+                                .setSpecUrl(String.format("%s%s/%s/%s/",
                                         url, wrapper.getCarBrand().getBrandName(),
                                         wrapper.getCarModel().getModelName(), pair.getSecond()))
+                        )
+                )
+                .collect(Collectors.toList());
+    }
+
+    private List<ParsedCarDataWrapper> getEquipmentNameAndUrlList(List<ParsedCarDataWrapper> wrappers) {
+        return wrappers
+                .stream()
+                .parallel()
+                .flatMap(wrapper -> fetchParsedPage(wrapper.getSpecUrl())
+                        .map(this::getListOfUrlsOfCarEquipment)
+                        .orElseGet(Collections::emptyList)
+                        .stream()
+                        .map(pair -> new ParsedCarDataWrapper()
+                                .mergeWrappers(wrapper)
+                                .setEquipmentName(pair.getFirst())
+                                .setEquipmentUrl(pureUrl + pair.getSecond())
                         )
                 )
                 .collect(Collectors.toList());
@@ -153,13 +175,30 @@ public class CarParserImpl implements CarParser {
                 .collect(Collectors.toList());
     }
 
+    private List<Pair<String, String>> getListOfUrlsOfCarEquipment(Document equipmentPage) {
+        return equipmentPage.getElementsByClass("b-table_align_center")
+                .stream()
+                .map(wrapper -> wrapper
+                        .siblingElements()
+                        .get(1)
+                        .siblingElements()
+                        .first())
+                .map(element -> {
+                    String equipmentUrl = Objects.requireNonNull(element)
+                            .attributes()
+                            .get("href");
+                    String equipmentName = element.text();
+
+                    return Pair.of(equipmentName, equipmentUrl);
+                })
+                .collect(Collectors.toList());
+    }
+
     /**
      * Example input:
      * Audi A6 (C7) 11.2010 - 11.2014
      */
     private String getSpecOfCar(String content) {
-        System.out.println("Content: " + content);
-
         String[] words = content.split("\\s+");
         String specWithBrackets;
 
@@ -184,8 +223,43 @@ public class CarParserImpl implements CarParser {
         return specWithBrackets;
     }
 
-    public static void main(String[] args) throws IOException {
-        var car = new CarParserImpl();
-        car.parseCarData();
+    private Car parseCarCharacteristics(String characteristicsUrl, Car car) throws IOException {
+        return CarCharacteristicsParser.ofCharacteristics(characteristicsUrl, car)
+                .orElseThrow(IOException::new)
+                .parseCarType()
+//                .parseForMarket()
+                .parseReleaseStartAndEnd()
+                .parseWeight()
+                .parseLengthAndWidthAndHeight()
+                .parseClearance()
+                .parseEngineCapacity()
+                .parseHorsePower()
+                .parseTorque()
+                .parseTransmissionType()
+                .parseAccelerationZeroToHundred()
+                .parseMaxSpeed()
+                .parseFuelTankVolume()
+                .parseFuelType()
+                .parseConsumptionInCity()
+                .parseConsumptionOutsideCity()
+                .parseConsumptionAverage()
+                .getCar();
+    }
+
+    private Optional<Car> mapParsedCarDataWrapperToCar(ParsedCarDataWrapper data) {
+        // set corresponding brand of model
+        data.getCarModel().setBrand(data.getCarBrand());
+
+        Car car = Car.builder()
+                .carModel(data.getCarModel())
+                .spec(data.getSpecName())
+                .equipment(data.getEquipmentName())
+                .build();
+
+        try {
+            return Optional.of(parseCarCharacteristics(data.getEquipmentUrl(), car));
+        } catch (IOException e) {
+            return Optional.empty();
+        }
     }
 }
