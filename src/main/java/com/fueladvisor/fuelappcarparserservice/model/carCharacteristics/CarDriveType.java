@@ -19,7 +19,7 @@ public enum CarDriveType {
             return REAR_WHEEL;
 
         // TODO: 20.03.2022 для проверки
-        System.out.println(parsedType);
+//        System.out.println(parsedType);
 
         return FOUR_WHEEL;
     }

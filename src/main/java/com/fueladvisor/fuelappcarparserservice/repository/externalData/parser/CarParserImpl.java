@@ -21,8 +21,17 @@ public class CarParserImpl implements CarParser {
     private static final String url = "https://www.drom.ru/catalog/";
     private static final String pureUrl = "https://www.drom.ru";
 
+    public static void main(String[] args) throws IOException {
+        var app = new CarParserImpl();
+        List<Car> cars = app.parseCarData();
+        cars.forEach(System.out::println);
+    }
+
     @Override
     public List<Car> parseCarData() throws IOException {
+
+        long before = System.currentTimeMillis();
+
         // parse page with brands names
         var wrappedBrand = getBrandNameAndUrlList();
 
@@ -31,6 +40,10 @@ public class CarParserImpl implements CarParser {
 
         // parse a list of specs of each model
         var wrappedSpec = getSpecNameAndUrlList(wrappedModel);
+
+        long after = System.currentTimeMillis();
+
+        System.out.println(after - before);
 
         // parse a list of equipments of each model
         var wrappedEquipment = getEquipmentNameAndUrlList(wrappedSpec);

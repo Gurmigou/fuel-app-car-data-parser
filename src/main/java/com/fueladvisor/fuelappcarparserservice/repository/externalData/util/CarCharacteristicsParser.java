@@ -4,10 +4,13 @@ import com.fueladvisor.fuelappcarparserservice.model.carCharacteristics.*;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import org.jsoup.Jsoup;
-import org.jsoup.nodes.Document;
+import org.jsoup.nodes.Element;
 
 import java.io.IOException;
+import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 import static com.fueladvisor.fuelappcarparserservice.model.carCharacteristics.CarDriveType.getTypeByParsedName;
 import static com.fueladvisor.fuelappcarparserservice.model.carCharacteristics.CarFuelConsumptionType.getFuelConsumptionTypeByParsedName;
@@ -23,22 +26,77 @@ public class CarCharacteristicsParser {
     private final CarSpeed carSpeed;
     private final CarFuel carFuel;
 
-    private final Document document;
+    private final List<String> upperTableValues;
+    private final Element lowerTable;
     private final Car car;
+
+    public static void main(String[] args) {
+        var car = new Car();
+
+
+        List<String> carUrls = List.of(
+                "https://www.drom.ru/catalog/audi/a6/269632/",
+                "https://www.drom.ru/catalog/audi/a6/269621/",
+                "https://www.drom.ru/catalog/audi/a6/269620/",
+                "https://www.drom.ru/catalog/audi/a6/269628/",
+                "https://www.drom.ru/catalog/audi/a6/269617/"
+        );
+
+        long before = System.currentTimeMillis();
+
+        carUrls.forEach(url -> {
+            long b = System.currentTimeMillis();
+            var parsedCar = ofCharacteristics(
+                    url, car)
+                    .get()
+                    .parseCarType()
+                    .parseReleaseStartAndEnd()
+                    .parseWeight()
+                    .parseLengthAndWidthAndHeight()
+                    .parseClearance()
+                    .parseEngineCapacity()
+                    .parseHorsePower()
+                    .parseTorque()
+                    .parseTransmissionType()
+                    .parseAccelerationZeroToHundred()
+                    .parseMaxSpeed()
+                    .parseFuelTankVolume()
+                    .parseFuelType()
+                    .parseConsumptionInCity()
+                    .parseConsumptionOutsideCity()
+                    .parseConsumptionAverage()
+                    .getCar();
+            long a = System.currentTimeMillis();
+
+//            System.out.println(parsedCar.getCarParams().getCarSpeed().getMaxSpeed());
+            System.out.println((a - b) + " ms");
+        });
+
+        long after = System.currentTimeMillis();
+
+        System.out.println((after - before) + " ms");
+    }
 
     public static Optional<CarCharacteristicsParser> ofCharacteristics(String url, Car car) {
         try {
             var document = Jsoup.connect(url).get();
-            return Optional.of(
-                    new CarCharacteristicsParser(
-                            new CarBody(),
-                            new CarEngine(),
-                            new CarTransmission(),
-                            new CarSpeed(),
-                            new CarFuel(),
-                            document,
-                            car
-                    )
+            var upperTableValues = requireNonNull(document
+                    .getElementsByClass("b-model-specs")
+                    .first())
+                    .getElementsByClass("b-model-specs__label")
+                    .stream()
+                    .map(element -> element.siblingElements().first())
+                    .filter(Objects::nonNull)
+                    .map(Element::text)
+                    .distinct()
+                    .collect(Collectors.toList());
+
+            var lowerTable = document.getElementsByClass(
+                    "b-table b-table_mobile-size-s b-table_text-left").first();
+
+            return Optional.of(new CarCharacteristicsParser(
+                    new CarBody(), new CarEngine(), new CarTransmission(),
+                    new CarSpeed(), new CarFuel(), upperTableValues, lowerTable, car)
             );
         } catch (IOException e) {
             return Optional.empty();
@@ -56,6 +114,36 @@ public class CarCharacteristicsParser {
         this.car.setCarParams(params);
         return this.car;
     }
+
+    /* ------------------------ Upper table ------------------------ */
+
+    public CarCharacteristicsParser parseEngineCapacity() {
+        String capacity = upperTableValues.get(2).split("\\s")[0];
+        carEngine.setCapacity(parseDouble(capacity));
+        return this;
+    }
+
+    public CarCharacteristicsParser parseHorsePower() {
+        String horsePower = upperTableValues.get(3).split("\\s")[0];
+        carEngine.setHorsePower(parseInt(horsePower));
+        return this;
+    }
+
+    public CarCharacteristicsParser parseTransmissionType() {
+        String transmissionType = upperTableValues.get(7).split("\\s")[0];
+        CarDriveType type = getTypeByParsedName(transmissionType);
+        carTransmission.setDriveType(type);
+        return this;
+    }
+
+    public CarCharacteristicsParser parseFuelType() {
+        String fuelType = upperTableValues.get(5);
+        CarFuelConsumptionType fuelConsumptionType = getFuelConsumptionTypeByParsedName(fuelType);
+        carFuel.setFuelType(fuelConsumptionType);
+        return this;
+    }
+
+    /* ------------------------ Lower table ------------------------ */
 
     public CarCharacteristicsParser parseWeight() {
         Optional<String> weightOption = parseElement("td:contains(Масса)");
@@ -82,29 +170,11 @@ public class CarCharacteristicsParser {
         return this;
     }
 
-    public CarCharacteristicsParser parseEngineCapacity() {
-        Optional<String> capacityOptional = parseElement("td:contains(Объем)");
-        capacityOptional.ifPresent(capacity -> carEngine.setCapacity(parseDouble(capacity)));
-        return this;
-    }
-
-    public CarCharacteristicsParser parseHorsePower() {
-        Optional<String> horsePowerOptional = parseElement("td:contains(Мощность)");
-        horsePowerOptional.ifPresent(horsePower -> carEngine.setHorsePower(parseInt(horsePower)));
-        return this;
-    }
-
     public CarCharacteristicsParser parseTorque() {
         Optional<String> torqueOptional = parseElement("td:contains(Максимальный крутящий момент)");
-        torqueOptional.ifPresent(torque -> carEngine.setTorque(parseInt(torque)));
-        return this;
-    }
-
-    public CarCharacteristicsParser parseTransmissionType() {
-        Optional<String> transmissionTypeOptional = parseElement("td:contains(Привод)");
-        transmissionTypeOptional.ifPresent(transmissionTypeParsed -> {
-            CarDriveType type = getTypeByParsedName(transmissionTypeParsed.split("\\s")[0]);
-            carTransmission.setDriveType(type);
+        torqueOptional.ifPresent(torque -> {
+            String torqueParsed = torque.split("\\s")[0];
+            carEngine.setTorque(parseInt(torqueParsed));
         });
         return this;
     }
@@ -128,36 +198,33 @@ public class CarCharacteristicsParser {
         return this;
     }
 
-    public CarCharacteristicsParser parseFuelType() {
-        Optional<String> fuelTypeOptional = parseElement("td:contains(Тип топлива)");
-        fuelTypeOptional.ifPresent(fuelType -> {
-            CarFuelConsumptionType fuelConsumptionType = getFuelConsumptionTypeByParsedName(fuelType);
-            carFuel.setFuelType(fuelConsumptionType);
-        });
-        return this;
-    }
-
     public CarCharacteristicsParser parseConsumptionInCity() {
         Optional<String> inCityConsOptional = parseElement(
                 "td:contains(Расход топлива в городском цикле)");
-        inCityConsOptional.ifPresent(inCityCons ->
-                carFuel.setConsumptionInCity(parseDouble(inCityCons)));
+        inCityConsOptional.ifPresent(inCityCons -> {
+            inCityCons = inCityCons.replace(',', '.');
+            carFuel.setConsumptionInCity(parseDouble(inCityCons));
+        });
         return this;
     }
 
     public CarCharacteristicsParser parseConsumptionOutsideCity() {
         Optional<String> outsideCityConsOptional = parseElement(
                 "td:contains(Расход топлива за городом)");
-        outsideCityConsOptional.ifPresent(outsideCityCons ->
-                carFuel.setConsumptionOutsideCity(parseDouble(outsideCityCons)));
+        outsideCityConsOptional.ifPresent(outsideCityCons -> {
+            outsideCityCons = outsideCityCons.replace(',', '.');
+            carFuel.setConsumptionOutsideCity(parseDouble(outsideCityCons));
+        });
         return this;
     }
 
     public CarCharacteristicsParser parseConsumptionAverage() {
         Optional<String> averageCityConsOptional = parseElement(
                 "td:contains(Расход топлива в смешанном цикле)");
-        averageCityConsOptional.ifPresent(averageCityCons ->
-                carFuel.setConsumptionAverage(parseDouble(averageCityCons)));
+        averageCityConsOptional.ifPresent(averageCityCons -> {
+            averageCityCons = averageCityCons.replace(',', '.');
+            carFuel.setConsumptionAverage(parseDouble(averageCityCons));
+        });
         return this;
     }
 
@@ -188,7 +255,7 @@ public class CarCharacteristicsParser {
     private Optional<String> parseElement(String selectQuery) {
         try {
             String text = requireNonNull(requireNonNull(
-                    document
+                    lowerTable
                             .clone()
                             .select(selectQuery)
                             .first())
