@@ -16,7 +16,7 @@ import java.io.IOException;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/car-data")
+@RequestMapping("/api/v1/car-data")
 public class CarController {
     private final CarService carService;
 
