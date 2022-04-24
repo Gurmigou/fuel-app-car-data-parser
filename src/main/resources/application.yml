@@ -5,22 +5,18 @@ spring:
   application:
      name: fuel-app-car-parser-service
   datasource:
-     url: jdbc:mysql://localhost:3309/car_info
-     username: root
-     password: root
-#    url: ${db_url}
-#    username: ${db_username}
-#    password: ${db_password}
+     url: jdbc:mysql://@eu-cdbr-west-02.cleardb.net/heroku_610556e2e57f804?reconnect=true&useUnicode=yes&characterEncoding=UTF-8
+     username: bf7dfc3b0c69f9
+     password: 25da58ea
      driver-class-name: com.mysql.cj.jdbc.Driver
   jpa:
      hibernate:
-        ddl-auto: create-drop
+        ddl-auto: update
      show-sql: true
 
-#eureka:
-#  client:
-#    serviceUrl:
-#      defaultZone: ${eureka_url}
-#  #         defaultZone: http://localhost:8761/eureka
-#  instance:
-#    instance-id: ${spring.application.name}:${spring.application.instance_id:${random.value}}
+eureka:
+  client:
+    serviceUrl:
+      defaultZone: https://e-petrol-eureka.herokuapp.com/eureka
+  instance:
+    instance-id: ${spring.application.name}:${spring.application.instance_id:${random.value}}

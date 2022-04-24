@@ -12,6 +12,6 @@ import javax.persistence.Embeddable;
 @Embeddable
 public class CarEngine {
     private Double capacity;
-    private Integer horsePower;
+    private Double horsePower;
     private Integer torque;
 }

@@ -4,11 +4,13 @@ import com.fueladvisor.fuelappcarparserservice.model.carBrandInfo.CarModel;
 import lombok.*;
 
 import javax.persistence.*;
+import java.util.Date;
 
 @Entity
 @Getter
 @Setter
 @Builder
+@ToString
 @NoArgsConstructor
 @AllArgsConstructor
 public class Car {
@@ -26,6 +28,7 @@ public class Car {
 
     @Column(name = "release_start_year")
     private Integer releaseStartYear;
+
     @Column(name = "relase_end_year")
     private Integer releaseEndYear;
 

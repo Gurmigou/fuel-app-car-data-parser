@@ -4,9 +4,11 @@ import com.fueladvisor.fuelappcarparserservice.model.carCharacteristics.*;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import org.jsoup.Jsoup;
+import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 
 import java.io.IOException;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -30,57 +32,10 @@ public class CarCharacteristicsParser {
     private final Element lowerTable;
     private final Car car;
 
-    public static void main(String[] args) {
-        var car = new Car();
-
-
-        List<String> carUrls = List.of(
-                "https://www.drom.ru/catalog/audi/a6/269632/",
-                "https://www.drom.ru/catalog/audi/a6/269621/",
-                "https://www.drom.ru/catalog/audi/a6/269620/",
-                "https://www.drom.ru/catalog/audi/a6/269628/",
-                "https://www.drom.ru/catalog/audi/a6/269617/"
-        );
-
-        long before = System.currentTimeMillis();
-
-        carUrls.forEach(url -> {
-            long b = System.currentTimeMillis();
-            var parsedCar = ofCharacteristics(
-                    url, car)
-                    .get()
-                    .parseCarType()
-                    .parseReleaseStartAndEnd()
-                    .parseWeight()
-                    .parseLengthAndWidthAndHeight()
-                    .parseClearance()
-                    .parseEngineCapacity()
-                    .parseHorsePower()
-                    .parseTorque()
-                    .parseTransmissionType()
-                    .parseAccelerationZeroToHundred()
-                    .parseMaxSpeed()
-                    .parseFuelTankVolume()
-                    .parseFuelType()
-                    .parseConsumptionInCity()
-                    .parseConsumptionOutsideCity()
-                    .parseConsumptionAverage()
-                    .getCar();
-            long a = System.currentTimeMillis();
-
-//            System.out.println(parsedCar.getCarParams().getCarSpeed().getMaxSpeed());
-            System.out.println((a - b) + " ms");
-        });
-
-        long after = System.currentTimeMillis();
-
-        System.out.println((after - before) + " ms");
-    }
-
     public static Optional<CarCharacteristicsParser> ofCharacteristics(String url, Car car) {
         try {
-            var document = Jsoup.connect(url).get();
-            var upperTableValues = requireNonNull(document
+            Document document = Jsoup.connect(url).get();
+            List<String> upperTableValues = requireNonNull(document
                     .getElementsByClass("b-model-specs")
                     .first())
                     .getElementsByClass("b-model-specs__label")
@@ -91,7 +46,7 @@ public class CarCharacteristicsParser {
                     .distinct()
                     .collect(Collectors.toList());
 
-            var lowerTable = document.getElementsByClass(
+            Element lowerTable = document.getElementsByClass(
                     "b-table b-table_mobile-size-s b-table_text-left").first();
 
             return Optional.of(new CarCharacteristicsParser(
@@ -125,7 +80,8 @@ public class CarCharacteristicsParser {
 
     public CarCharacteristicsParser parseHorsePower() {
         String horsePower = upperTableValues.get(3).split("\\s")[0];
-        carEngine.setHorsePower(parseInt(horsePower));
+        horsePower = horsePower.replace(',', '.');
+        carEngine.setHorsePower(parseDouble(horsePower));
         return this;
     }
 
@@ -242,12 +198,12 @@ public class CarCharacteristicsParser {
             if (isNumber(years[0]))
                 car.setReleaseStartYear(parseInt(years[0]));
             else
-                car.setReleaseStartYear(null);
+                car.setReleaseStartYear(0);
 
             if (isNumber(years[1]))
                 car.setReleaseEndYear(parseInt(years[1]));
             else
-                car.setReleaseEndYear(null);
+                car.setReleaseEndYear(LocalDate.now().getYear());
         });
         return this;
     }

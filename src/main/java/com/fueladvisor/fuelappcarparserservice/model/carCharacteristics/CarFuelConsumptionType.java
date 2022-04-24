@@ -18,10 +18,6 @@ public enum CarFuelConsumptionType {
             return GAS;
         if (parsedType.equals("Бензин"))
             return PETROL;
-
-        // TODO: 20.03.2022 для проверки
-//        System.out.println(parsedType);
-
         return ELECTRICITY;
     }
 }

@@ -3,8 +3,10 @@ package com.fueladvisor.fuelappcarparserservice.repository.externalData.util;
 import com.fueladvisor.fuelappcarparserservice.model.carBrandInfo.CarBrand;
 import com.fueladvisor.fuelappcarparserservice.model.carBrandInfo.CarModel;
 import lombok.Getter;
+import lombok.ToString;
 
 @Getter
+@ToString
 public class ParsedCarDataWrapper {
     private CarBrand carBrand;
     private String brandUrl;

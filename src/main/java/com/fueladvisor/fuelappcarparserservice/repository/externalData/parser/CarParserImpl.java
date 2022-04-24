@@ -1,5 +1,6 @@
 package com.fueladvisor.fuelappcarparserservice.repository.externalData.parser;
 
+import com.fueladvisor.fuelappcarparserservice.dto.CarBrandParseDto;
 import com.fueladvisor.fuelappcarparserservice.model.carBrandInfo.CarBrand;
 import com.fueladvisor.fuelappcarparserservice.model.carBrandInfo.CarModel;
 import com.fueladvisor.fuelappcarparserservice.model.carCharacteristics.Car;
@@ -21,38 +22,75 @@ public class CarParserImpl implements CarParser {
     private static final String url = "https://www.drom.ru/catalog/";
     private static final String pureUrl = "https://www.drom.ru";
 
-    public static void main(String[] args) throws IOException {
-        var app = new CarParserImpl();
-        List<Car> cars = app.parseCarData();
-        cars.forEach(System.out::println);
-    }
-
     @Override
-    public List<Car> parseCarData() throws IOException {
-
-        long before = System.currentTimeMillis();
-
+    public List<Car> parseAllCarData() throws IOException {
         // parse page with brands names
-        var wrappedBrand = getBrandNameAndUrlList();
-
-        // parse a list of models of each brand
-        var wrappedModel = getModelNameAndUrlList(wrappedBrand);
-
-        // parse a list of specs of each model
-        var wrappedSpec = getSpecNameAndUrlList(wrappedModel);
-
-        long after = System.currentTimeMillis();
-
-        System.out.println(after - before);
+        List<ParsedCarDataWrapper> wrappedBrand = getBrandNameAndUrlList();
 
         // parse a list of equipments of each model
-        var wrappedEquipment = getEquipmentNameAndUrlList(wrappedSpec);
+        List<ParsedCarDataWrapper> wrappedEquipment = parseModelAndSpecAndEquipment(wrappedBrand);
 
         return wrappedEquipment.stream()
+                .parallel()
                 .map(this::mapParsedCarDataWrapperToCar)
                 .filter(Optional::isPresent)
                 .map(Optional::get)
                 .collect(Collectors.toList());
+    }
+
+    @Override
+    public List<Car> parseCarDataByCarBrands(List<CarBrandParseDto> brandsParseDto) throws IOException {
+        List<ParsedCarDataWrapper> wrappedBrand = mapCarBrandParseDtoToParsedCarDataWrapperList(brandsParseDto);
+
+        // parse a list of equipments of each model
+        List<ParsedCarDataWrapper> wrappedEquipment = parseModelAndSpecAndEquipment(wrappedBrand);
+
+        return wrappedEquipment.stream()
+                .parallel()
+                .map(this::mapParsedCarDataWrapperToCar)
+                .filter(Optional::isPresent)
+                .map(Optional::get)
+                .collect(Collectors.toList());
+    }
+
+    private List<ParsedCarDataWrapper> parseModelAndSpecAndEquipment(List<ParsedCarDataWrapper> wrappedBrandList) {
+        // parse a list of models of each brand
+        List<ParsedCarDataWrapper> wrappedModel = getModelNameAndUrlList(wrappedBrandList);
+
+        // parse a list of specs of each model
+        List<ParsedCarDataWrapper> wrappedSpec = getSpecNameAndUrlList(wrappedModel);
+
+        // parse a list of equipments of each model
+        return getEquipmentNameAndUrlList(wrappedSpec);
+    }
+
+    @Override
+    public List<Car> parseCarDataByCarPages(List<String> urlList) throws IOException {
+        List<Car> list = new ArrayList<>();
+        for (String url : urlList) {
+            Car car = new Car();
+            Car parsedCar = CarCharacteristicsParser.ofCharacteristics(url, car)
+                    .orElseThrow(IOException::new)
+                    .parseCarType()
+                    .parseReleaseStartAndEnd()
+                    .parseWeight()
+                    .parseLengthAndWidthAndHeight()
+                    .parseClearance()
+                    .parseEngineCapacity()
+                    .parseHorsePower()
+                    .parseTorque()
+                    .parseTransmissionType()
+                    .parseAccelerationZeroToHundred()
+                    .parseMaxSpeed()
+                    .parseFuelTankVolume()
+                    .parseFuelType()
+                    .parseConsumptionInCity()
+                    .parseConsumptionOutsideCity()
+                    .parseConsumptionAverage()
+                    .getCar();
+            list.add(parsedCar);
+        }
+        return list;
     }
 
     private List<ParsedCarDataWrapper> getBrandNameAndUrlList() throws IOException {
@@ -60,6 +98,7 @@ public class CarParserImpl implements CarParser {
                 .map(this::getListOfUrlsOfCarBrand)
                 .orElseThrow(IOException::new)
                 .stream()
+                .parallel()
                 .map(pair -> new ParsedCarDataWrapper()
                          .setCarBrand(pair.getFirst())
                          .setBrandUrl(pair.getSecond()))
@@ -139,7 +178,7 @@ public class CarParserImpl implements CarParser {
     }
 
     private List<Pair<String, String>> getListOfUrlsOfCarSpec(Document modelPage, String... countiesFor) {
-        var specList = new ArrayList<Pair<String, String>>();
+        List<Pair<String, String>> specList = new ArrayList<>();
 
         for (String countryFor : countiesFor) {
             Element countryBlock = modelPage.getElementById(countryFor);
@@ -153,6 +192,7 @@ public class CarParserImpl implements CarParser {
             List<String> specUrls = specBlock
                     .getElementsByClass("e1ei9t6a1")
                     .stream()
+                    .parallel()
                     .map(Element::attributes)
                     .map(attributes -> attributes.get("href"))
                     .collect(Collectors.toList());
@@ -160,6 +200,7 @@ public class CarParserImpl implements CarParser {
             List<String> specNames = specBlock
                     .getElementsByClass("e1ei9t6a2")
                     .stream()
+                    .parallel()
                     .map(element -> getSpecOfCar(element.text()))
                     .collect(Collectors.toList());
 
@@ -180,6 +221,7 @@ public class CarParserImpl implements CarParser {
 
         return document.getElementsByClass(classParse)
                 .stream()
+                .parallel()
                 .map(element -> {
                     T wrapper = func.apply(element.text());
                     String url = element.attributes().get("href");
@@ -188,9 +230,10 @@ public class CarParserImpl implements CarParser {
                 .collect(Collectors.toList());
     }
 
-    private List<Pair<String, String>> getListOfUrlsOfCarEquipment(Document equipmentPage) {
+    protected List<Pair<String, String>> getListOfUrlsOfCarEquipment(Document equipmentPage) {
         return equipmentPage.getElementsByClass("b-table_align_center")
                 .stream()
+                .parallel()
                 .map(wrapper -> wrapper
                         .siblingElements()
                         .get(1)
@@ -223,7 +266,7 @@ public class CarParserImpl implements CarParser {
                 return specWithBrackets.substring(1, rightBracket);
 
         } else {
-            var sb = new StringBuilder();
+            StringBuilder sb = new StringBuilder();
             for (int i = 2; i < words.length - 3; i++) {
                 sb.append(words[i]);
 
@@ -240,7 +283,6 @@ public class CarParserImpl implements CarParser {
         return CarCharacteristicsParser.ofCharacteristics(characteristicsUrl, car)
                 .orElseThrow(IOException::new)
                 .parseCarType()
-//                .parseForMarket()
                 .parseReleaseStartAndEnd()
                 .parseWeight()
                 .parseLengthAndWidthAndHeight()
@@ -268,11 +310,23 @@ public class CarParserImpl implements CarParser {
                 .spec(data.getSpecName())
                 .equipment(data.getEquipmentName())
                 .build();
-
         try {
             return Optional.of(parseCarCharacteristics(data.getEquipmentUrl(), car));
         } catch (IOException e) {
             return Optional.empty();
         }
+    }
+
+    private List<ParsedCarDataWrapper> mapCarBrandParseDtoToParsedCarDataWrapperList(
+            List<CarBrandParseDto> parseDtoList) {
+
+        return parseDtoList.stream()
+                .map(carBrandParseDto -> {
+                    ParsedCarDataWrapper parsedCarDataWrapper = new ParsedCarDataWrapper();
+                    parsedCarDataWrapper.setCarBrand(new CarBrand(carBrandParseDto.getBrandName()));
+                    parsedCarDataWrapper.setBrandUrl(carBrandParseDto.getBrandUrl());
+                    return parsedCarDataWrapper;
+                })
+                .collect(Collectors.toList());
     }
 }
